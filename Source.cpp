@@ -3,8 +3,6 @@
 #include <windows.h>
 #include "resource.h"
 
-TCHAR szClassName[] = TEXT("Window");
-
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	static BOOL bCapture;
@@ -14,8 +12,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	{
 	case WM_CREATE:
 		CreateWindow(TEXT("STATIC"), 0, WS_CHILD | WS_VISIBLE | SS_BITMAP | SS_NOTIFY, 10, 10, 42, 42, hWnd, (HMENU)1, ((LPCREATESTRUCT)(lParam))->hInstance, 0);
-		CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("EDIT"), TEXT("1024"), WS_CHILD | WS_VISIBLE | ES_NUMBER | ES_AUTOHSCROLL, 10, 50, 128, 32, hWnd, (HMENU)2, ((LPCREATESTRUCT)(lParam))->hInstance, 0);
-		CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("EDIT"), TEXT("768"), WS_CHILD | WS_VISIBLE | ES_NUMBER | ES_AUTOHSCROLL, 10, 90, 128, 32, hWnd, (HMENU)3, ((LPCREATESTRUCT)(lParam))->hInstance, 0);
+		CreateWindow(TEXT("STATIC"), TEXT("幅(&W):"), WS_CHILD | WS_VISIBLE | SS_RIGHT, 10, 90, 64, 32, hWnd, (HMENU)1, ((LPCREATESTRUCT)(lParam))->hInstance, 0);
+		CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("EDIT"), TEXT("1024"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_NUMBER | ES_AUTOHSCROLL, 74, 90, 128, 32, hWnd, (HMENU)2, ((LPCREATESTRUCT)(lParam))->hInstance, 0);
+		CreateWindow(TEXT("STATIC"), TEXT("高さ(&H):"), WS_CHILD | WS_VISIBLE | SS_RIGHT, 10, 130, 64, 42, hWnd, (HMENU)1, ((LPCREATESTRUCT)(lParam))->hInstance, 0);
+		CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("EDIT"), TEXT("768"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_NUMBER | ES_AUTOHSCROLL, 74, 130, 128, 32, hWnd, (HMENU)3, ((LPCREATESTRUCT)(lParam))->hInstance, 0);
 		hBitmap1 = LoadBitmap(((LPCREATESTRUCT)(lParam))->hInstance, MAKEINTRESOURCE(IDB_BITMAP_FINDER_FILLED));
 		hBitmap2 = LoadBitmap(((LPCREATESTRUCT)(lParam))->hInstance, MAKEINTRESOURCE(IDB_BITMAP_FINDER_EMPTY));
 		hCursor = LoadCursor(((LPCREATESTRUCT)(lParam))->hInstance, MAKEINTRESOURCE(IDC_CURSOR_SEARCH_WINDOW));
@@ -48,14 +48,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 				const int nWidth = GetDlgItemInt(hWnd, 2, 0, 0);
 				const int nHeight = GetDlgItemInt(hWnd, 3, 0, 0);
 				const HWND hWndTarget = GetAncestor(WindowFromPoint(point), GA_ROOT);
-				if (IsZoomed(hWndTarget))
+				if (hWndTarget != hWnd)
 				{
-					ShowWindow(hWndTarget, SW_RESTORE);
+					if (IsZoomed(hWndTarget))
+					{
+						ShowWindow(hWndTarget, SW_RESTORE);
+					}
+					SetWindowPos(hWndTarget, 0, (MonitorInfo.rcWork.right - MonitorInfo.rcWork.left - nWidth) / 2, (MonitorInfo.rcWork.bottom - MonitorInfo.rcWork.top - nHeight) / 2, GetDlgItemInt(hWnd, 2, 0, 0), GetDlgItemInt(hWnd, 3, 0, 0), SWP_NOZORDER | SWP_NOSENDCHANGING);
+					SetForegroundWindow(hWndTarget);
 				}
-				SetWindowPos(hWndTarget, 0, (MonitorInfo.rcWork.right - MonitorInfo.rcWork.left - nWidth) / 2, (MonitorInfo.rcWork.bottom - MonitorInfo.rcWork.top - nHeight) / 2, GetDlgItemInt(hWnd, 2, 0, 0), GetDlgItemInt(hWnd, 3, 0, 0), SWP_NOZORDER | SWP_NOSENDCHANGING);
-				SetForegroundWindow(hWndTarget);
 			}
 		}
+		break;
+	case WM_CLOSE:
+		DestroyWindow(hWnd);
 		break;
 	case WM_DESTROY:
 		DeleteObject(hBitmap1);
@@ -63,35 +69,39 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		PostQuitMessage(0);
 		break;
 	default:
-		return DefWindowProc(hWnd, msg, wParam, lParam);
+		return DefDlgProc(hWnd, msg, wParam, lParam);
 	}
 	return 0;
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPreInst, LPSTR pCmdLine, int nCmdShow)
 {
+	TCHAR szClassName[] = TEXT("Window");
 	MSG msg;
 	WNDCLASS wndclass = {
-		CS_HREDRAW | CS_VREDRAW,
+		0,
 		WndProc,
 		0,
-		0,
+		DLGWINDOWEXTRA,
 		hInstance,
 		0,
 		LoadCursor(0,IDC_ARROW),
-		(HBRUSH)(COLOR_WINDOW + 1),
+		0,
 		0,
 		szClassName
 	};
 	RegisterClass(&wndclass);
+	RECT rect = { 0, 0, 320, 240 };
+	const DWORD dwStyle = WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+	AdjustWindowRect(&rect, dwStyle, 0);
 	HWND hWnd = CreateWindow(
 		szClassName,
-		TEXT("指定したウィンドウのサイズを調整する"),
-		WS_OVERLAPPEDWINDOW,
+		TEXT("指定したウィンドウサイズを調整"),
+		dwStyle,
 		CW_USEDEFAULT,
 		0,
-		CW_USEDEFAULT,
-		0,
+		rect.right - rect.left,
+		rect.bottom - rect.top,
 		0,
 		0,
 		hInstance,
@@ -101,8 +111,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPreInst, LPSTR pCmdLine, int 
 	UpdateWindow(hWnd);
 	while (GetMessage(&msg, 0, 0, 0))
 	{
-		TranslateMessage(&msg);
-		DispatchMessage(&msg);
+		if (!IsDialogMessage(hWnd, &msg))
+		{
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
 	}
 	return (int)msg.wParam;
 }
